@@ -1,0 +1,21 @@
+.custom-tabs .nav-link {
+    border: none !important;  /* Remove outline */
+    background: transparent !important;
+    color: #ccc !important;  /* Light gray text */
+    transition: background-color 0.3s ease-in-out, border-radius 0.3s ease-in-out;
+    padding: 10px 15px !important;  /* Keep padding fixed */
+}
+
+.custom-tabs .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important; /* Light gray hover effect */
+    border-radius: 50px !important; /* Circle effect */
+    transform: scale(1.1); /* Slightly increase size instead of changing padding */
+
+}
+
+.custom-tabs .nav-link.active {
+    background-color: transparent !important; /* Keep background clear when active */
+    border-bottom: none !important; /* Remove bottom border */
+    font-weight: bold;
+    color: white !important;
+}
