@@ -274,7 +274,8 @@ def update_output(content, filename, date):
                                         'color': '#333',
                                         'boxShadow': '0 2px 10px rgba(0,0,0,0.3)',
                                         'fontSize': '0.95em',
-                                        'marginTop': '10px'
+                                        'marginTop': '10px',
+                                        'marginRight': '10px',
                                     }
                                 )
                             ], justify="between")
