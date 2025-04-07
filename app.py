@@ -2,6 +2,7 @@ import dash
 from dash import html, dcc, Output, Input, State, no_update, dash_table
 import dash_bootstrap_components as dbc
 import requests
+import pandas as pd
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
@@ -79,6 +80,7 @@ app.layout = dbc.Container([
     State('upload-dataset', 'filename'),
     State('upload-dataset', 'last_modified')
 )
+
 def update_output(content, filename, date):
     if content is not None:
         # Content is available as a base64 string
@@ -110,6 +112,14 @@ def update_output(content, filename, date):
                             dbc.Alert(f"Error loading data: {dataset_data['error']}", color="warning")
                         )
                     
+                    # Create a Pandas Datafram for Stats
+                    df = pd.DataFrame(dataset_data['data'])
+                    num_rows = df.shape[0]
+                    num_cols = df.shape[1]
+                    missing_values = df.isnull().sum().sum()
+                    numeric_columns = df.select_dtypes(include='number')
+                    summary_stats = numeric_columns.describe().to_dict()
+
                     # Create a data table
                     data_table = dash_table.DataTable(
                         id='dataset-table',
@@ -132,6 +142,13 @@ def update_output(content, filename, date):
                             'border': 'none',  # Remove borders
                             'borderBottom': '1px solid #ddd'  # Only keep bottom border
                         },
+                        style_header_conditional=[
+                            {
+                                'if': {'column_id': 'Row #'},
+                                'color': '#f1f1f1',  # Same as background to "hide"
+                                'fontSize': '0.01em'
+                            }
+                        ],
                         style_cell={
                             'backgroundColor': 'white',
                             'color': '#333',
@@ -144,6 +161,18 @@ def update_output(content, filename, date):
                             'textOverflow': 'ellipsis',
                             'border': 'none'  # Remove borders between cells
                         },
+                        style_cell_conditional=[
+                            {
+                                'if': {'column_id': 'Row #'},
+                                'minWidth': '40px',
+                                'width': '50px',
+                                'maxWidth': '50px',
+                                'textAlign': 'right',
+                                'padding': '0 8px',
+                                'color': '#999',
+                                'backgroundColor': '#f4f4f4'
+                            }
+                        ],
                         style_data={
                             'borderBottom': '1px solid #eee'  # Light border between rows
                         },
@@ -156,6 +185,15 @@ def update_output(content, filename, date):
                                 'if': {'state': 'selected'},
                                 'backgroundColor': 'rgba(220, 220, 220, 0.5)',  # Light gray for selected cells
                                 'border': '1px solid #ddd'
+                            },
+                            {
+                                'if': {'column_id': 'Row #'},  
+                                'backgroundColor': '#f4f4f4',
+                                'color': '#888',
+                                'textAlign': 'right',
+                                'fontWeight': 'normal',
+                                'fontSize': '0.85em',
+                                'padding': '0 8px'
                             }
                         ],
                         style_as_list_view=True,  # Removes vertical grid lines
@@ -183,7 +221,9 @@ def update_output(content, filename, date):
                                     'marginTop': '10px', 
                                     'fontSize': '0.9em', 
                                     'color': '#777',
-                                    'textAlign': 'right'
+                                    'textAlign': 'right',
+                                    'maxWidth': '65%',
+                                    'marginLeft': 'auto'
                                 }
                             )
                         ],
@@ -192,25 +232,55 @@ def update_output(content, filename, date):
                             'padding': '20px',
                             'borderRadius': '8px',
                             'boxShadow': '0 2px 10px rgba(0,0,0,0.05)',
-                            'marginTop': '20px'
+                            'marginTop': '10px'
                         }
                     )
 
                     # Return the styled container
                     return (
                         dbc.Alert(f"Successfully uploaded {filename}", color="success"),
-                        f"Dataset Preview: {filename}",
-                        table_container
+                        "",  # clear the old title output
+                        html.Div([
+                            dbc.Row([
+                                dbc.Col(
+                                    html.H5(f"Dataset Preview: {filename}"),
+                                    width=6
+                                ),
+                                dbc.Col(
+                                    html.H5("Dataset Summary", style={"color": "white"}),  # optional white for dark theme
+                                    width=6
+                                )
+                            ], align="center"),
+                            dbc.Row([
+                                dbc.Col(
+                                    table_container,
+                                    width=6  
+                                ),
+                                dbc.Col(
+                                    html.Div([
+                                        html.P(f"Rows: {num_rows}"),
+                                        html.P(f"Columns: {num_cols}"),
+                                        html.P(f"Missing values: {missing_values}"),
+                                        html.H6("Numeric Column Stats:"),
+                                        html.Ul([
+                                            html.Li(f"{col}: mean={round(stats['mean'], 2)}, std={round(stats['std'], 2)}")
+                                            for col, stats in summary_stats.items()
+                                            if col != "Row #" and 'mean' in stats and 'std' in stats
+                                        ])
+                                    ]), style= {
+                                        'backgroundColor': '#f4f4f4',
+                                        'padding': '20px',
+                                        'borderRadius': '8px',
+                                        'color': '#333',
+                                        'boxShadow': '0 2px 10px rgba(0,0,0,0.3)',
+                                        'fontSize': '0.95em',
+                                        'marginTop': '10px'
+                                    }
+                                )
+                            ], justify="between")
+                        ])
                     )
-                                        
-                    total_rows_info = html.P(f"Showing first {len(dataset_data['data'])} of {dataset_data['total_rows']} rows", 
-                                            style={'marginTop': '10px', 'fontSize': '0.9em', 'color': '#aaa'})
-                    
-                    return (
-                        dbc.Alert(f"Successfully uploaded {filename}", color="success"),
-                        f"Dataset Preview: {filename}",
-                        html.Div([data_table, total_rows_info])
-                    )
+                
                 else:
                     return (
                         dbc.Alert(f"Successfully uploaded {filename}", color="success"),
