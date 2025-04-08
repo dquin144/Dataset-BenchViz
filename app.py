@@ -34,7 +34,6 @@ app.layout = dbc.Container([
                                     'borderStyle': 'dashed',
                                     'borderRadius': '5px',
                                     'textAlign': 'center',
-                                    'margin': '10px',
                                     'cursor': 'pointer',
                                     'transition': 'all 0.3s ease',
                                 },
@@ -43,7 +42,7 @@ app.layout = dbc.Container([
                             ),
                             html.Div(id='upload-status'),
                             html.Hr(),
-                            html.H5("Dataset Preview", id="dataset-title"),
+                            #html.H5("Dataset Preview", id="dataset-title"),
                             # Just one loading spinner for the dataset display
                             dcc.Loading(
                                 id="loading-dataset",
@@ -74,8 +73,7 @@ app.layout = dbc.Container([
 # Callback to handle file upload
 @app.callback(
     [Output('upload-status', 'children'),
-     Output('dataset-title', 'children'),
-     Output('dataset-display', 'children')],
+    Output('dataset-display', 'children')],
     Input('upload-dataset', 'contents'),
     State('upload-dataset', 'filename'),
     State('upload-dataset', 'last_modified')
@@ -108,8 +106,28 @@ def update_output(content, filename, date):
                     if 'error' in dataset_data:
                         return (
                             dbc.Alert(f"Successfully uploaded {filename}", color="success"),
-                            f"Dataset Preview: {filename}",
-                            dbc.Alert(f"Error loading data: {dataset_data['error']}", color="warning")
+                            html.Div([
+                                dbc.Row([
+                                    dbc.Col(
+                                        html.H5(f"Dataset Preview: {filename}"),
+                                        width=6
+                                    ),
+                                    dbc.Col(
+                                        html.H5("Dataset Summary", style={"color": "white"}),
+                                        width=6
+                                    )
+                                ], align="center"),
+                                dbc.Row([
+                                    dbc.Col(
+                                        dbc.Alert(f"Error loading data: {dataset_data['error']}", color="warning"),
+                                        width=6,
+                                    ),
+                                    dbc.Col(
+                                        html.P("Unable to generate summary due to data loading error.", className="text-muted"),
+                                        width=6
+                                    )
+                                ])
+                            ])
                         )
                     
                     # Create a Pandas Datafram for Stats
@@ -239,7 +257,6 @@ def update_output(content, filename, date):
                     # Return the styled container
                     return (
                         dbc.Alert(f"Successfully uploaded {filename}", color="success"),
-                        "",  # clear the old title output
                         html.Div([
                             dbc.Row([
                                 dbc.Col(
@@ -247,36 +264,85 @@ def update_output(content, filename, date):
                                     width=6
                                 ),
                                 dbc.Col(
-                                    html.H5("Dataset Summary", style={"color": "white"}),  # optional white for dark theme
+                                    html.H5("Dataset Summary", style={"color": "white"}),
                                     width=6
                                 )
                             ], align="center"),
                             dbc.Row([
                                 dbc.Col(
                                     table_container,
-                                    width=6  
+                                    width=6,
                                 ),
                                 dbc.Col(
                                     html.Div([
-                                        html.P(f"Rows: {num_rows}"),
-                                        html.P(f"Columns: {num_cols}"),
-                                        html.P(f"Missing values: {missing_values}"),
-                                        html.H6("Numeric Column Stats:"),
-                                        html.Ul([
-                                            html.Li(f"{col}: mean={round(stats['mean'], 2)}, std={round(stats['std'], 2)}")
-                                            for col, stats in summary_stats.items()
-                                            if col != "Row #" and 'mean' in stats and 'std' in stats
-                                        ])
-                                    ]), style= {
-                                        'backgroundColor': '#f4f4f4',
-                                        'padding': '20px',
-                                        'borderRadius': '8px',
-                                        'color': '#333',
-                                        'boxShadow': '0 2px 10px rgba(0,0,0,0.3)',
-                                        'fontSize': '0.95em',
-                                        'marginTop': '10px',
-                                        'marginRight': '10px',
-                                    }
+                                        # Calculate completeness
+                                        html.Div([
+                                            dbc.Row([
+                                                dbc.Col([
+                                                    html.Div([
+                                                        html.Div(f"{num_rows:,}", className="stat-value"),
+                                                        html.Div("Total Rows", className="stat-label")
+                                                    ], className="stat-card")
+                                                ], width=6, md=3),
+                                                dbc.Col([
+                                                    html.Div([
+                                                        html.Div(f"{num_cols}", className="stat-value"),
+                                                        html.Div("Columns", className="stat-label")
+                                                    ], className="stat-card")
+                                                ], width=6, md=3),
+                                                dbc.Col([
+                                                    html.Div([
+                                                        html.Div(f"{missing_values:,}", className="stat-value"),
+                                                        html.Div("Missing Values", className="stat-label")
+                                                    ], className="stat-card")
+                                                ], width=6, md=3),
+                                                dbc.Col([
+                                                    html.Div([
+                                                        html.Div(f"{100 - round((missing_values / (num_rows * num_cols)) * 100, 2):.1f}%", className="stat-value"),
+                                                        html.Div("Completeness", className="stat-label")
+                                                    ], className="stat-card")
+                                                ], width=6, md=3),
+                                            ])
+                                        ]),
+                                        
+                                        # Numeric column stats (keeping the original format but with updated styling)
+                                        html.Div([
+                                            html.H6("Column Statistics", className="column-stats-header"),
+                                            
+                                            # Add a div with scrolling
+                                            html.Div([
+                                                # Create a table for the stats
+                                                html.Table([
+                                                    html.Thead([
+                                                        html.Tr([
+                                                            html.Th("Column"),
+                                                            html.Th("Type"),
+                                                            html.Th("Mean"),
+                                                            html.Th("Std"),
+                                                            html.Th("Min"),
+                                                            html.Th("Max")
+                                                        ])
+                                                    ]),
+                                                    html.Tbody([
+                                                        html.Tr([
+                                                            html.Td(col),
+                                                            html.Td(html.Span("numeric", className="column-type-badge")),
+                                                            html.Td(f"{stats.get('mean', 'N/A'):.2f}"),
+                                                            html.Td(f"{stats.get('std', 'N/A'):.2f}"),
+                                                            html.Td(f"{stats.get('min', 'N/A'):.2f}"),
+                                                            html.Td(f"{stats.get('max', 'N/A'):.2f}")
+                                                        ])
+                                                        for col, stats in summary_stats.items()  # Remove the [:5] limit
+                                                        if col != "Row #" and isinstance(stats, dict)
+                                                    ])
+                                                ], className="column-stats-table")
+                                            ], style={
+                                                'maxHeight': '300px',  # Set a maximum height
+                                                'overflowY': 'auto',   # Enable vertical scrolling
+                                                'overflowX': 'auto'    # Enable horizontal scrolling if needed
+                                            })
+                                        ], className="column-stats-card")
+                                    ], style={"marginTop": "10px"})
                                 )
                             ], justify="between")
                         ])
@@ -285,24 +351,105 @@ def update_output(content, filename, date):
                 else:
                     return (
                         dbc.Alert(f"Successfully uploaded {filename}", color="success"),
-                        f"Dataset Preview: {filename}",
-                        dbc.Alert(f"Error: Could not retrieve dataset preview", color="warning")
+                        html.Div([
+                            dbc.Row([
+                                dbc.Col(
+                                    html.H5(f"Dataset Preview: {filename}"),
+                                    width=6
+                                ),
+                                dbc.Col(
+                                    html.H5("Dataset Summary", style={"color": "white"}),
+                                    width=6
+                                )
+                            ], align="center"),
+                            dbc.Row([
+                                dbc.Col(
+                                    dbc.Alert(f"Error: Could not retrieve dataset preview", color="warning"),
+                                    width=6,
+                                ),
+                                dbc.Col(
+                                    html.P("Unable to generate summary due to data loading error.", className="text-muted"),
+                                    width=6
+                                )
+                            ])
+                        ])
                     )
             else:
                 return (
                     dbc.Alert(f"Error uploading file: {response.text}", color="danger"),
-                    "Dataset Preview",
-                    html.P("No dataset to display")
+                    html.Div([
+                        dbc.Row([
+                            dbc.Col(
+                                html.H5("Dataset Preview"),
+                                width=6
+                            ),
+                            dbc.Col(
+                                html.H5("Dataset Summary", style={"color": "white"}),
+                                width=6
+                            )
+                        ], align="center"),
+                        dbc.Row([
+                            dbc.Col(
+                                html.P("No dataset to display"),
+                                width=6,
+                            ),
+                            dbc.Col(
+                                html.P("Upload a dataset to see summary", className="text-muted"),
+                                width=6
+                            )
+                        ])
+                    ])
                 )
         
         except Exception as e:
             return (
                 dbc.Alert(f"Error: {str(e)}", color="danger"),
-                "Dataset Preview",
-                html.P("No dataset to display")
+                html.Div([
+                    dbc.Row([
+                        dbc.Col(
+                            html.H5("Dataset Preview"),
+                            width=6
+                        ),
+                        dbc.Col(
+                            html.H5("Dataset Summary", style={"color": "white"}),
+                            width=6
+                        )
+                    ], align="center"),
+                    dbc.Row([
+                        dbc.Col(
+                            html.P("No dataset to display"),
+                            width=6,
+                        ),
+                        dbc.Col(
+                            html.P("Upload a dataset to see summary", className="text-muted"),
+                            width=6
+                        )
+                    ])
+                ])
             )
     
-    return no_update, no_update, html.P("Upload a dataset to see preview")
+    return no_update, html.Div([
+        dbc.Row([
+            dbc.Col(
+                html.H5("Dataset Preview"),
+                width=6
+            ),
+            dbc.Col(
+                html.H5("Dataset Summary", style={"color": "white"}),
+                width=6
+            )
+        ], align="center"),
+        dbc.Row([
+            dbc.Col(
+                html.P("Upload a dataset to see preview", className="text-muted"),
+                width=6,
+            ),
+            dbc.Col(
+                html.P("Upload a dataset to see summary", className="text-muted"),
+                width=6
+            )
+        ])
+    ])
 
 # Run the app
 if __name__ == '__main__':
