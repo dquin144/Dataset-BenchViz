@@ -102,6 +102,19 @@ def update_output(content, filename, date):
                 
                 if dataset_response.status_code == 200:
                     dataset_data = dataset_response.json()
+
+                    # Use statistics from the backend
+                    num_rows = dataset_data['total_rows']
+                    num_cols = dataset_data['total_cols']
+                    missing_values = dataset_data['missing_values']
+                    summary_stats = dataset_data['summary_stats']
+                    column_types = dataset_data['column_types']
+                    
+                    # Create DataFrame for display
+                    df = pd.DataFrame(dataset_data['data'])
+                    all_columns = [col for col in df.columns if col != "Row #"]
+
+                    numeric_columns = dataset_data.get('numeric_columns', [])
                     
                     if 'error' in dataset_data:
                         return (
@@ -129,14 +142,8 @@ def update_output(content, filename, date):
                                 ])
                             ])
                         )
-                    
-                    # Create a Pandas Datafram for Stats
-                    df = pd.DataFrame(dataset_data['data'])
-                    num_rows = df.shape[0]
-                    num_cols = df.shape[1]
-                    missing_values = df.isnull().sum().sum()
-                    numeric_columns = df.select_dtypes(include='number')
-                    summary_stats = numeric_columns.describe().to_dict()
+
+                    all_columns = [col for col in df.columns if col != "Row #"]
 
                     # Create a data table
                     data_table = dash_table.DataTable(
@@ -219,10 +226,10 @@ def update_output(content, filename, date):
                         sort_action='native',    # Add sorting capability
                         fixed_rows={'headers': True},
                         
-                        # Add some interactivity
+                        # Add tool tip for interactivity
                         tooltip_data=[
                             {
-                                column: {'value': str(value), 'type': 'text'}
+                                column: {'value': str(value) if value is not None else "null", 'type': 'text'}
                                 for column, value in row.items()
                             } for row in dataset_data['data']
                         ],
@@ -326,14 +333,28 @@ def update_output(content, filename, date):
                                                     html.Tbody([
                                                         html.Tr([
                                                             html.Td(col),
-                                                            html.Td(html.Span("numeric", className="column-type-badge")),
-                                                            html.Td(f"{stats.get('mean', 'N/A'):.2f}"),
-                                                            html.Td(f"{stats.get('std', 'N/A'):.2f}"),
-                                                            html.Td(f"{stats.get('min', 'N/A'):.2f}"),
-                                                            html.Td(f"{stats.get('max', 'N/A'):.2f}")
+                                                            html.Td(html.Span(
+                                                                "numeric" if "float" in column_types.get(col, "").lower() or "int" in column_types.get(col, "").lower() else "string", 
+                                                                className="column-type-badge"
+                                                            )),
+                                                            html.Td(
+                                                                f"{summary_stats.get(col, {}).get('mean', 'N/A'):.2f}" 
+                                                                if col in numeric_columns else "--"
+                                                            ),
+                                                            html.Td(
+                                                                f"{summary_stats.get(col, {}).get('std', 'N/A'):.2f}" 
+                                                                if col in numeric_columns else "--"
+                                                            ),
+                                                            html.Td(
+                                                                f"{summary_stats.get(col, {}).get('min', 'N/A'):.2f}" 
+                                                                if col in numeric_columns else "--"
+                                                            ),
+                                                            html.Td(
+                                                                f"{summary_stats.get(col, {}).get('max', 'N/A'):.2f}" 
+                                                                if col in numeric_columns else "--"
+                                                            )
                                                         ])
-                                                        for col, stats in summary_stats.items()  # Remove the [:5] limit
-                                                        if col != "Row #" and isinstance(stats, dict)
+                                                        for col in all_columns
                                                     ])
                                                 ], className="column-stats-table")
                                             ], style={
